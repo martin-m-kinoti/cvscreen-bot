@@ -138,7 +138,7 @@ class _SignInPageState extends State<SignInPage> {
                 FilledButton(
                   onPressed: _signIn,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF6C4FE0),
+                    backgroundColor: const Color(0xFF009688),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     textStyle: const TextStyle(
                       fontSize: 16,
@@ -160,7 +160,7 @@ class _SignInPageState extends State<SignInPage> {
                       child: const Text(
                         'Sign up',
                         style: TextStyle(
-                          color: Color(0xFF6C4FE0),
+                          color: Color(0xFF009688),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
