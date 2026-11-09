@@ -138,7 +138,7 @@ class _SignInPageState extends State<SignInPage> {
                 FilledButton(
                   onPressed: _signIn,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF009688),
+                    backgroundColor: const Color(0xFF0D9488),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     textStyle: const TextStyle(
                       fontSize: 16,
@@ -160,7 +160,7 @@ class _SignInPageState extends State<SignInPage> {
                       child: const Text(
                         'Sign up',
                         style: TextStyle(
-                          color: Color(0xFF009688),
+                          color: Color(0xFF0D9488),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -208,6 +208,10 @@ class _SignInPageState extends State<SignInPage> {
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF0D9488), width: 2),
             ),
           ),
         ),
