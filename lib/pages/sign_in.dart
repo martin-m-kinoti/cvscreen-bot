@@ -278,6 +278,7 @@ class _SignInPageState extends State<SignInPage> {
           obscureText: obscureText,
           onFieldSubmitted: onSubmitted,
           validator: validator,
+          cursorColor: const Color(0xFF0D9488),
           decoration: InputDecoration(
             hintText: hint,
             suffixIcon: suffix,

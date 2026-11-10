@@ -468,6 +468,7 @@ class _SignUpPageState extends State<SignUpPage> {
           onChanged: onChanged,
           onFieldSubmitted: onSubmitted,
           validator: validator,
+          cursorColor: const Color(0xFF0D9488),
           decoration: InputDecoration(
             hintText: hint,
             suffixIcon: suffix,
