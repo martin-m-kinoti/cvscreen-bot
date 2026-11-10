@@ -1,6 +1,10 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-class HomePage extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/auth_service.dart';
+
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   static const _teal = Color(0xFF0D9488);
@@ -13,6 +17,59 @@ class HomePage extends StatelessWidget {
     'CV analyzed',
     'Get status',
   ];
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final _auth = AuthService();
+  late final StreamSubscription<AuthState> _authSubscription;
+  Session? _session;
+  bool _signingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _session = _auth.session;
+    _authSubscription = _auth.authChanges.listen(
+      (state) {
+        if (!mounted) return;
+        setState(() => _session = state.session);
+      },
+      onError: (Object _) {
+        if (!mounted) return;
+        setState(() => _session = _auth.session);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
+
+  Future<void> _signOut() async {
+    setState(() => _signingOut = true);
+    try {
+      await _auth.signOut();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.describeError(e)),
+          backgroundColor: const Color(0xFFB91C1C),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
+    }
+  }
+
+  void _startScreening() {
+    Navigator.pushNamed(context, _session == null ? '/sign-in' : '/cv-screen');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,24 +88,53 @@ class HomePage extends StatelessWidget {
                       children: [
                         Image.asset('lib/assets/logo.png', height: 40),
                         const Spacer(),
-                        TextButton(
-                          onPressed: () =>
-                              Navigator.pushNamed(context, '/sign-in'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.grey.shade700,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            minimumSize: const Size(0, 36),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle: const TextStyle(fontSize: 13),
+                        if (_session == null)
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.pushNamed(context, '/sign-in'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.grey.shade700,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              minimumSize: const Size(0, 36),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              textStyle: const TextStyle(fontSize: 13),
+                            ),
+                            child: const Text('Sign in'),
+                          )
+                        else ...[
+                          Tooltip(
+                            message: _auth.displayName,
+                            child: CircleAvatar(
+                              radius: 14,
+                              backgroundColor:
+                                  HomePage._teal.withValues(alpha: 0.12),
+                              child: Text(
+                                _auth.displayName.characters.first.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: HomePage._teal,
+                                ),
+                              ),
+                            ),
                           ),
-                          child: const Text('Sign in'),
-                        ),
+                          TextButton(
+                            onPressed: _signingOut ? null : _signOut,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.grey.shade700,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              minimumSize: const Size(0, 36),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              textStyle: const TextStyle(fontSize: 13),
+                            ),
+                            child: Text(_signingOut ? 'Signing out…' : 'Sign out'),
+                          ),
+                        ],
                         const SizedBox(width: 6),
                         FilledButton(
-                          onPressed: () =>
-                              Navigator.pushNamed(context, '/cv-screen'),
+                          onPressed: _startScreening,
                           style: FilledButton.styleFrom(
-                            backgroundColor: _teal,
+                            backgroundColor: HomePage._teal,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -78,7 +164,7 @@ class HomePage extends StatelessWidget {
                           ),
                           TextSpan(
                             text: 'Screen',
-                            style: TextStyle(color: _teal),
+                            style: TextStyle(color: HomePage._teal),
                           ),
                         ],
                       ),
@@ -115,10 +201,10 @@ class HomePage extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Column(
                         children: [
-                          for (var i = 0; i < _steps.length; i++)
+                          for (var i = 0; i < HomePage._steps.length; i++)
                             _StepTile(
-                              label: _steps[i],
-                              isLast: i == _steps.length - 1,
+                              label: HomePage._steps[i],
+                              isLast: i == HomePage._steps.length - 1,
                             ),
                         ],
                       ),
@@ -196,8 +282,8 @@ class _ContactFooter extends StatelessWidget {
 
   // Placeholder contact details — replace with the real values.
   static const _website = 'cvscreening.vercel.app';
-  static const _email = 'cvscreening@example.co.ke';
-  static const _phone = '+254 7XX XXX XXX';
+  static const _email = 'cvscreening@gmail.co.ke';
+  static const _phone = '+254 793 002 282';
 
   @override
   Widget build(BuildContext context) {
