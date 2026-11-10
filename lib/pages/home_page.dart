@@ -68,7 +68,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _startScreening() {
-    Navigator.pushNamed(context, _session == null ? '/sign-in' : '/cv-screen');
+    Navigator.pushNamed(context, _session == null ? '/sign-in' : '/jobs');
   }
 
   @override
@@ -213,13 +213,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: _ContactFooter(),
-              ),
-            ),
           ],
         ),
       ),
@@ -273,85 +266,6 @@ class _StepTile extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ContactFooter extends StatelessWidget {
-  const _ContactFooter();
-
-  // Placeholder contact details — replace with the real values.
-  static const _website = 'cvscreening.vercel.app';
-  static const _email = 'cvscreening@gmail.co.ke';
-  static const _phone = '+254 793 002 282';
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: HomePage._teal,
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Contact',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _contactRow(
-            const Icon(Icons.language, size: 18, color: Colors.black87),
-            _website,
-          ),
-          const SizedBox(height: 10),
-          _contactRow(
-            const Icon(Icons.email, size: 18, color: Color(0xFFEA4335)),
-            _email,
-            underlined: true,
-          ),
-          const SizedBox(height: 10),
-          _contactRow(
-            const CircleAvatar(
-              radius: 9,
-              backgroundColor: Color(0xFF25D366),
-              child: Icon(Icons.phone, size: 11, color: Colors.white),
-            ),
-            _phone,
-          ),
-          const SizedBox(height: 12),
-          const Center(
-            child: Text(
-              '© 2026 CVScreen AI. All rights reserved.',
-              style: TextStyle(fontSize: 11, color: Colors.white70),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _contactRow(Widget icon, String text, {bool underlined = false}) {
-    return Row(
-      children: [
-        icon,
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white,
-              decoration: underlined ? TextDecoration.underline : null,
-              decorationColor: Colors.white,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

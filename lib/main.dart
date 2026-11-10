@@ -5,9 +5,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/app_config.dart';
 import 'services/auth_service.dart';
 import 'pages/home_page.dart';
+import 'pages/jobs_page.dart';
 import 'pages/sign_in.dart';
 import 'pages/sign_up.dart';
 import 'pages/cv_screen.dart';
+import 'pages/jobs_page.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -70,9 +72,11 @@ class _MyAppState extends State<MyApp> {
       initialRoute: '/',
       routes: {
         '/': (context) => const HomePage(),
+        '/jobs': (context) => const JobsPage(),
         '/sign-up': (context) => const SignUpPage(),
         '/sign-in': (context) => const SignInPage(),
         '/cv-screen': (context) => const CvScreenPage(),
+        '/jobs': (context) => const JobsPage(),
       },
     );
   }
