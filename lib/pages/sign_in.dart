@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../services/auth_service.dart';
+import '../widgets/auth_error_banner.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -10,9 +12,13 @@ class SignInPage extends StatefulWidget {
 
 class _SignInPageState extends State<SignInPage> {
   final _formKey = GlobalKey<FormState>();
+  final _auth = AuthService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _submitting = false;
+  bool _googleBusy = false;
+  String? _error;
 
   static const _googleIcon = '''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -30,9 +36,38 @@ class _SignInPageState extends State<SignInPage> {
     super.dispose();
   }
 
-  void _signIn() {
-    if (_formKey.currentState!.validate()) {
-      Navigator.pushReplacementNamed(context, '/');
+  bool get _busy => _submitting || _googleBusy;
+
+  Future<void> _signIn() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await _auth.signIn(_emailController.text, _passwordController.text);
+    } catch (e) {
+      if (mounted) setState(() => _error = AuthService.describeError(e));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _continueWithGoogle() async {
+    if (_busy) return;
+    setState(() {
+      _googleBusy = true;
+      _error = null;
+    });
+    try {
+      final launched = await _auth.signInWithGoogle();
+      if (!launched && mounted) {
+        setState(() => _error = 'Could not open Google sign-in on this device.');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = AuthService.describeError(e));
+    } finally {
+      if (mounted) setState(() => _googleBusy = false);
     }
   }
 
@@ -64,15 +99,29 @@ class _SignInPageState extends State<SignInPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                OutlinedButton.icon(
-                  onPressed: () {
-                  },
-                  icon: SvgPicture.string(
-                    _googleIcon,
-                    height: 20,
-                    width: 20,
+                if (_error != null) ...[
+                  AuthErrorBanner(
+                    message: _error!,
+                    onDismiss: () => setState(() => _error = null),
                   ),
-                  label: const Text('Continue with Google'),
+                  const SizedBox(height: 16),
+                ],
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _continueWithGoogle,
+                  icon: _googleBusy
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : SvgPicture.string(
+                          _googleIcon,
+                          height: 20,
+                          width: 20,
+                        ),
+                  label: Text(
+                    _googleBusy ? 'Opening Google…' : 'Continue with Google',
+                  ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     side: const BorderSide(color: Colors.black54),
@@ -105,10 +154,13 @@ class _SignInPageState extends State<SignInPage> {
                   label: 'Email address',
                   hint: 'your@gmail.com',
                   controller: _emailController,
+                  enabled: !_busy,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'Enter your email';
-                    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
+                    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) {
                       return 'Enter a valid email address';
                     }
                     return null;
@@ -119,7 +171,11 @@ class _SignInPageState extends State<SignInPage> {
                   label: 'Enter your Password',
                   hint: 'Min 8 characters',
                   controller: _passwordController,
+                  enabled: !_busy,
                   obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.password],
+                  onSubmitted: (_) => _signIn(),
                   suffix: IconButton(
                     icon: Icon(
                       _obscurePassword ? Icons.visibility_off : Icons.visibility,
@@ -136,16 +192,27 @@ class _SignInPageState extends State<SignInPage> {
                 ),
                 const SizedBox(height: 28),
                 FilledButton(
-                  onPressed: _signIn,
+                  onPressed: _busy ? null : _signIn,
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF0D9488),
+                    disabledBackgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.5),
+                    disabledForegroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     textStyle: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  child: const Text('Sign In'),
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Sign In'),
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -156,7 +223,9 @@ class _SignInPageState extends State<SignInPage> {
                       style: TextStyle(color: Colors.grey.shade700),
                     ),
                     GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, '/sign-up'),
+                      onTap: _busy
+                          ? null
+                          : () => Navigator.pushReplacementNamed(context, '/sign-up'),
                       child: const Text(
                         'Sign up',
                         style: TextStyle(
@@ -180,8 +249,12 @@ class _SignInPageState extends State<SignInPage> {
     required String hint,
     TextEditingController? controller,
     TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+    Iterable<String>? autofillHints,
+    bool enabled = true,
     bool obscureText = false,
     Widget? suffix,
+    ValueChanged<String>? onSubmitted,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -199,8 +272,13 @@ class _SignInPageState extends State<SignInPage> {
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          autofillHints: autofillHints,
+          enabled: enabled,
           obscureText: obscureText,
+          onFieldSubmitted: onSubmitted,
           validator: validator,
+          cursorColor: const Color(0xFF0D9488),
           decoration: InputDecoration(
             hintText: hint,
             suffixIcon: suffix,
