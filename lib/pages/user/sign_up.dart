@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../services/auth_service.dart';
-import '../widgets/auth_error_banner.dart';
+import '../../services/auth_service.dart';
+import '../../widgets/auth_error_banner.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});

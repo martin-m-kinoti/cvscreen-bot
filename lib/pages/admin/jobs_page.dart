@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../models/job.dart';
-import '../services/auth_service.dart';
-import '../services/jobs_service.dart';
-import '../widgets/auth_error_banner.dart';
-import '../widgets/confirm_dialog.dart';
-import '../widgets/dashboard_nav_bar.dart';
+import '../../models/job.dart';
+import '../../services/auth_service.dart';
+import '../../services/jobs_service.dart';
+import '../../widgets/auth_error_banner.dart';
+import '../../widgets/confirm_dialog.dart';
+import '../../widgets/dashboard_nav_bar.dart';
 
 class JobsPage extends StatefulWidget {
   const JobsPage({super.key});

@@ -1,14 +1,14 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../models/application.dart';
-import '../models/job.dart';
-import '../services/applications_service.dart';
-import '../services/auth_service.dart';
-import '../services/jobs_service.dart';
-import '../widgets/auth_error_banner.dart';
-import '../widgets/confirm_dialog.dart';
-import '../widgets/dashboard_nav_bar.dart';
+import '../../models/application.dart';
+import '../../models/job.dart';
+import '../../services/applications_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/jobs_service.dart';
+import '../../widgets/auth_error_banner.dart';
+import '../../widgets/confirm_dialog.dart';
+import '../../widgets/dashboard_nav_bar.dart';
 
 /// Candidate journey: upload a CV against an advertised job, then review the
 /// match result. Shared teal/border palette with the rest of the dashboard.
@@ -180,9 +180,11 @@ class _CvUploadState extends State<CvUpload> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Image.asset('lib/assets/logo.png', height: 40),
+              _AuthHeader(
+                signedIn: _auth.isSignedIn,
+                displayName: _auth.displayName,
+                teal: CvUpload.teal,
+                onSignIn: () => Navigator.pushNamed(context, '/sign-in'),
               ),
               const SizedBox(height: 12),
               const Text(
@@ -522,9 +524,11 @@ class _MyApplicationsState extends State<MyApplications> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Image.asset('lib/assets/logo.png', height: 40),
+              _AuthHeader(
+                signedIn: _auth.isSignedIn,
+                displayName: _auth.displayName,
+                teal: MyApplications.teal,
+                onSignIn: () => Navigator.pushNamed(context, '/sign-in'),
               ),
               const SizedBox(height: 12),
               const Text(
@@ -691,4 +695,65 @@ class _DashedBorder extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DashedBorder oldDelegate) =>
       oldDelegate.color != color;
+}
+
+/// Logo plus the signed-in avatar initial (or a teal Sign in button), shared by
+/// the candidate pages' headers.
+class _AuthHeader extends StatelessWidget {
+  const _AuthHeader({
+    required this.signedIn,
+    required this.displayName,
+    required this.teal,
+    required this.onSignIn,
+  });
+
+  final bool signedIn;
+  final String displayName;
+  final Color teal;
+  final VoidCallback onSignIn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Image.asset('lib/assets/logo.png', height: 40),
+        const Spacer(),
+        if (!signedIn)
+          FilledButton(
+            onPressed: onSignIn,
+            style: FilledButton.styleFrom(
+              backgroundColor: teal,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            child: const Text('Sign in'),
+          )
+        else
+          Tooltip(
+            message: displayName,
+            child: CircleAvatar(
+              radius: 16,
+              backgroundColor: teal.withValues(alpha: 0.12),
+              child: Text(
+                displayName.characters.first.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: teal,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
