@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
+import '../widgets/confirm_dialog.dart';
+import '../widgets/dashboard_nav_bar.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,9 +15,10 @@ class HomePage extends StatefulWidget {
   static const _steps = [
     'Sign in',
     'Navigate to CV Screening page',
-    'Upload CV',
+    'Candidate Uploads CV',
     'CV analyzed',
     'Get status',
+    'Review candidate profile and fit',
   ];
 
   @override
@@ -51,6 +54,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _signOut() async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Sign out?',
+      message: 'You will need to sign in again to continue.',
+      confirmLabel: 'Sign out',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _signingOut = true);
     try {
       await _auth.signOut();
@@ -68,13 +78,52 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _startScreening() {
-    Navigator.pushNamed(context, _session == null ? '/sign-in' : '/jobs');
+    Navigator.pushNamed(context, '/upload-cv');
+  }
+
+  void _onNavTap(int index) {
+    switch (index) {
+      case 0:
+        break;
+      case 1:
+        Navigator.pushReplacementNamed(context, '/jobs');
+      case 2:
+        Navigator.pushNamed(context, '/upload-cv');
+      case 3:
+        Navigator.pushNamed(context, '/applications');
+      case 4:
+        _signOutFromNav();
+    }
+  }
+
+  Future<void> _signOutFromNav() async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Sign out?',
+      message: 'You will need to sign in again to continue.',
+      confirmLabel: 'Sign out',
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await _auth.signOut();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/sign-in', (route) => false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.describeError(e)),
+          backgroundColor: const Color(0xFFB91C1C),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      bottomNavigationBar: DashboardNavBar(currentIndex: 0, onTap: _onNavTap),
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -150,7 +199,7 @@ class _HomePageState extends State<HomePage> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          child: const Text('Start Screening'),
+                          child: const Text('Apply'),
                         ),
                       ],
                     ),

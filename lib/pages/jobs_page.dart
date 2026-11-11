@@ -3,6 +3,7 @@ import '../models/job.dart';
 import '../services/auth_service.dart';
 import '../services/jobs_service.dart';
 import '../widgets/auth_error_banner.dart';
+import '../widgets/confirm_dialog.dart';
 import '../widgets/dashboard_nav_bar.dart';
 
 class JobsPage extends StatefulWidget {
@@ -200,25 +201,13 @@ class _JobsPageState extends State<JobsPage> {
   }
 
   Future<void> _confirmDelete(Job job) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete job?'),
-        content: Text('Remove "${job.title}" and its requirements.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB91C1C)),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete job?',
+      message: 'Remove "${job.title}" and its requirements.',
+      confirmLabel: 'Delete',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     try {
       await _service.deleteJob(job.id);
       if (!mounted) return;
@@ -254,6 +243,13 @@ class _JobsPageState extends State<JobsPage> {
   }
 
   Future<void> _signOut() async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Sign out?',
+      message: 'You will need to sign in again to continue.',
+      confirmLabel: 'Sign out',
+    );
+    if (!confirmed || !mounted) return;
     try {
       await _auth.signOut();
       if (!mounted) return;

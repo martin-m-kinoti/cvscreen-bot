@@ -9,7 +9,7 @@ import 'pages/jobs_page.dart';
 import 'pages/sign_in.dart';
 import 'pages/sign_up.dart';
 import 'pages/cv_screen.dart';
-import 'pages/jobs_page.dart';
+import 'pages/upload_cv.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -76,7 +76,8 @@ class _MyAppState extends State<MyApp> {
         '/sign-up': (context) => const SignUpPage(),
         '/sign-in': (context) => const SignInPage(),
         '/cv-screen': (context) => const CvScreenPage(),
-        '/jobs': (context) => const JobsPage(),
+        '/upload-cv': (context) => const CvUpload(),
+        '/applications': (context) => const MyApplications(),
       },
     );
   }
