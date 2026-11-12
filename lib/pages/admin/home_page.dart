@@ -17,9 +17,11 @@ class AdminHome extends StatefulWidget {
 
   static const steps = [
     'Sign in',
-    'Navigate to CV Screening page',
-    'Upload CV',
-    'CV analyzed',
+    'Navigate to Jobs page',
+    'Register a new open job',
+    'Navigate to Applications page',
+    'Review candidate applications as they are scanned',
+    'Manage users and their roles',
   ];
 
   @override

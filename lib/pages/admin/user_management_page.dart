@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../models/app_user.dart';
 import '../../services/auth_service.dart';
+import '../../services/users_service.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/dashboard_header.dart';
 import '../../widgets/dashboard_nav_bar.dart';
 
-/// Recruiter directory of registered candidates with email search and
-/// per-user edit/delete. Sample rows stand in until the users backend is linked.
+/// Recruiter directory of registered accounts, read live from Supabase's
+/// `auth.users` table through the `admin_list_users()` function, with email
+/// search and per-user edit/delete.
 class UserManagement extends StatefulWidget {
   const UserManagement({super.key});
 
@@ -19,10 +22,19 @@ class UserManagement extends StatefulWidget {
 
 class _UserManagementState extends State<UserManagement> {
   final _auth = AuthService();
+  final _users = UsersService();
   final _searchController = TextEditingController();
 
-  // Populated by the users backend.
-  final List<_UserRow> _users = [];
+  List<AppUser> _rows = const [];
+  bool _isLoading = true;
+  String? _error;
+  String? _isDeleting;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -30,10 +42,31 @@ class _UserManagementState extends State<UserManagement> {
     super.dispose();
   }
 
-  List<_UserRow> get _filtered {
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final users = await _users.fetchUsers();
+      if (!mounted) return;
+      setState(() {
+        _rows = users;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = UsersService.describeError(e);
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<AppUser> get _filtered {
     final q = _searchController.text.trim().toLowerCase();
-    if (q.isEmpty) return _users;
-    return _users.where((u) => u.email.toLowerCase().contains(q)).toList();
+    if (q.isEmpty) return _rows;
+    return _rows.where((u) => u.email.toLowerCase().contains(q)).toList();
   }
 
   void _onNavTap(int index) {
@@ -74,7 +107,7 @@ class _UserManagementState extends State<UserManagement> {
     }
   }
 
-  Future<void> _confirmDelete(_UserRow user) async {
+  Future<void> _confirmDelete(AppUser user) async {
     final confirmed = await ConfirmDialog.show(
       context,
       title: 'Delete user?',
@@ -82,13 +115,70 @@ class _UserManagementState extends State<UserManagement> {
       confirmLabel: 'Delete',
     );
     if (!confirmed || !mounted) return;
-    setState(() => _users.removeWhere((u) => u.email == user.email));
+    setState(() => _isDeleting = user.id);
+    try {
+      await _users.deleteUser(user.id);
+      if (!mounted) return;
+      setState(() {
+        _rows = _rows.where((u) => u.id != user.id).toList();
+        _isDeleting = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isDeleting = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(UsersService.describeError(e)),
+          backgroundColor: UserManagement.danger,
+        ),
+      );
+    }
   }
 
-  void _onEdit(_UserRow user) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Editing ${user.name} is coming soon.')),
+  String? get _currentUserId => _auth.user?.id;
+
+  bool _isSelf(AppUser user) => user.id == _currentUserId;
+
+  Future<void> _editEmail(AppUser user) async {
+    final newEmail = await showDialog<String>(
+      context: context,
+      builder: (_) => _EmailEditDialog(initialEmail: user.email),
     );
+    final trimmed = newEmail?.trim() ?? '';
+    if (trimmed.isEmpty || trimmed == user.email) return;
+    try {
+      await _users.updateUserEmail(user.id, trimmed);
+      if (!mounted) return;
+      setState(() {
+        _rows = [
+          for (final u in _rows)
+            u.id == user.id
+                ? AppUser(
+                    id: u.id,
+                    name: u.name,
+                    email: trimmed,
+                    role: u.role,
+                    createdAt: u.createdAt,
+                    lastActive: u.lastActive,
+                  )
+                : u,
+        ];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email updated.'),
+          backgroundColor: UserManagement.teal,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(UsersService.describeError(e)),
+          backgroundColor: UserManagement.danger,
+        ),
+      );
+    }
   }
 
   @override
@@ -156,6 +246,43 @@ class _UserManagementState extends State<UserManagement> {
   }
 
   Widget _buildTable() {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: UserManagement.teal,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          children: [
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: UserManagement.danger),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: _load,
+              style: TextButton.styleFrom(foregroundColor: UserManagement.teal),
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      );
+    }
+
     final rows = _filtered;
     return Column(
       children: [
@@ -167,12 +294,14 @@ class _UserManagementState extends State<UserManagement> {
         ),
         const SizedBox(height: 14),
         if (rows.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
             child: Text(
-              'No users match this search.',
+              _rows.isEmpty
+                  ? 'No registered users yet.'
+                  : 'No users match this search.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey),
+              style: const TextStyle(fontSize: 13, color: Colors.grey),
             ),
           )
         else
@@ -180,21 +309,38 @@ class _UserManagementState extends State<UserManagement> {
             _row(
               _cell(u.name, flex: 3),
               _cell(u.email, flex: 4, underline: true),
-              _cell(u.lastActive, flex: 3, color: Colors.grey.shade600),
+              _cell(u.lastActiveLabel, flex: 3, color: Colors.grey.shade600),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   InkWell(
-                    onTap: () => _onEdit(u),
+                    onTap: () => _editEmail(u),
                     child: const Icon(Icons.edit_outlined,
                         size: 18, color: UserManagement.teal),
                   ),
                   const SizedBox(width: 12),
-                  InkWell(
-                    onTap: () => _confirmDelete(u),
-                    child: const Icon(Icons.delete_outline,
-                        size: 18, color: UserManagement.danger),
-                  ),
+                  if (_isSelf(u))
+                    // Protect the signed-in recruiter's own account from deletion.
+                    const Padding(
+                      padding: EdgeInsets.only(right: 4),
+                      child: Icon(Icons.lock_outline,
+                          size: 16, color: Colors.grey),
+                    )
+                  else
+                    InkWell(
+                      onTap: _isDeleting == u.id ? null : () => _confirmDelete(u),
+                      child: _isDeleting == u.id
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: UserManagement.danger,
+                              ),
+                            )
+                          : const Icon(Icons.delete_outline,
+                              size: 18, color: UserManagement.danger),
+                    ),
                 ],
               ),
             ),
@@ -219,6 +365,7 @@ class _UserManagementState extends State<UserManagement> {
       flex: flex,
       child: Text(
         text,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 12,
           fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
@@ -230,9 +377,63 @@ class _UserManagementState extends State<UserManagement> {
   }
 }
 
-class _UserRow {
-  const _UserRow(this.name, this.email, this.lastActive);
-  final String name;
-  final String email;
-  final String lastActive;
+/// Owns its [TextEditingController] so the controller is disposed with the
+/// dialog element, not by the caller after pop (which trips the framework's
+/// `_dependents.isEmpty` assertion).
+class _EmailEditDialog extends StatefulWidget {
+  const _EmailEditDialog({required this.initialEmail});
+
+  final String initialEmail;
+
+  @override
+  State<_EmailEditDialog> createState() => _EmailEditDialogState();
+}
+
+class _EmailEditDialogState extends State<_EmailEditDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialEmail);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      title: const Text('Edit email',
+          style: TextStyle(fontSize: 17, color: Colors.black87)),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.emailAddress,
+        cursorColor: UserManagement.teal,
+        style: const TextStyle(fontSize: 14),
+        decoration: InputDecoration(
+          labelText: 'Email',
+          labelStyle: const TextStyle(color: Colors.grey),
+          focusedBorder: const UnderlineInputBorder(
+            borderSide: BorderSide(color: UserManagement.teal, width: 2),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(foregroundColor: Colors.grey.shade600),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () =>
+              Navigator.pop(context, _controller.text.trim()),
+          style: FilledButton.styleFrom(
+            backgroundColor: UserManagement.teal,
+          ),
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
 }
