@@ -109,17 +109,12 @@ class _CvUploadState extends State<CvUpload> {
     try {
       final job = _selectedJob!;
       final bytes = await _cvFile!.readAsBytes();
-      final draft = Application(
-        id: '',
+      await _applications.submitCv(
+        userId: userId,
+        cvBytes: bytes,
+        cvFileName: _cvFile!.name,
         jobId: job.id,
         jobTitle: job.title,
-        applicantId: userId,
-        cvFileName: _cvFile!.name,
-        createdAt: DateTime.now(),
-      );
-      await _applications.submitApplication(
-        application: draft,
-        cvBytes: bytes,
       );
       if (!mounted) return;
       setState(() => _submitted = true);
@@ -605,17 +600,13 @@ class _ApplicationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMatch = application.status == 'match';
-    final label = switch (application.status) {
-      'match' => 'Match',
-      'no_match' => 'Not a match',
-      _ => 'Under review',
+    final (label, color) = switch (application.status) {
+      'Strong Match' => ('Strong Match', MyApplications.teal),
+      'Possible Match' => ('Possible Match', const Color(0xFFB45309)),
+      'Not a Match' => ('Not a Match', const Color(0xFFB91C1C)),
+      _ => ('Under review', Colors.grey.shade600),
     };
-    final color = switch (application.status) {
-      'match' => MyApplications.teal,
-      'no_match' => const Color(0xFFB91C1C),
-      _ => Colors.grey.shade600,
-    };
+    final score = application.overallScore.round();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
@@ -623,29 +614,56 @@ class _ApplicationCard extends StatelessWidget {
         border: Border.all(color: MyApplications.border),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              application.jobTitle,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'CV review',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          if (!application.isPending) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Overall match: $score%',
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                color: MyApplications.teal,
               ),
             ),
-          ),
+          ],
+          const SizedBox(height: 6),
           Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: isMatch ? FontWeight.w700 : FontWeight.w500,
-              color: color,
-            ),
+            'Uploaded ${_formatDate(application.createdAt)}',
+            style: const TextStyle(fontSize: 11, color: Colors.grey),
           ),
         ],
       ),
     );
+  }
+
+  static String _formatDate(DateTime d) {
+    final local = d.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-'
+        '${local.day.toString().padLeft(2, '0')}';
   }
 }
 

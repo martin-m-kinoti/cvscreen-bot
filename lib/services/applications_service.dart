@@ -1,78 +1,63 @@
 import 'dart:typed_data';
 
+import 'package:http/http.dart' as http;
+
 import '../config/app_config.dart';
 import '../models/application.dart';
 
-/// Candidate-facing applications. Rows are written here; the CV analysis that
-/// flips `status` from `pending` to `match`/`no_match` is owned by the backend
-/// (see [requestAnalysis]) and is expected to update the same row.
+/// Candidate-facing applications. The CV is NOT stored in Supabase: it is
+/// streamed to the n8n screening workflow, which reads the job requirements,
+/// scores the CV and writes the resulting `applications` row that
+/// [fetchApplications] later shows back to the candidate.
 class ApplicationsService {
-  static const _bucket = 'cvs';
-
-  Future<List<Application>> fetchApplications(String applicantId) async {
+  Future<List<Application>> fetchApplications(String userId) async {
     final rows = await supabase
         .from('applications')
         .select()
-        .eq('applicant_id', applicantId)
+        .eq('id', userId)
         .order('created_at', ascending: false);
     return rows.map(Application.fromMap).toList();
   }
 
-  /// Stores the CV (best-effort) and records a `pending` application.
-  Future<Application> submitApplication({
-    required Application application,
-    Uint8List? cvBytes,
+  /// Uploads the CV to the n8n webhook with the signed-in user's Supabase
+  /// access token as the `Authorization` header. The workflow needs the
+  /// `auth.users` uuid and the CV file; `job_id`/`job_title` are sent as extra
+  /// fields so the run can be tied to the advertised role.
+  Future<void> submitCv({
+    required String userId,
+    required Uint8List cvBytes,
+    required String cvFileName,
+    String? jobId,
+    String? jobTitle,
   }) async {
-    var storagePath = application.cvStoragePath;
-    if (cvBytes != null && storagePath == null) {
-      storagePath = await _uploadCv(
-        applicantId: application.applicantId,
-        fileName: application.cvFileName,
-        bytes: cvBytes,
-      );
+    final accessToken = supabase.auth.currentSession?.accessToken;
+    if (accessToken == null) {
+      throw StateError('Please sign in before applying.');
     }
-    final row = await supabase
-        .from('applications')
-        .insert({
-          ...application.toMap(),
-          'cv_storage_path': storagePath,
-        })
-        .select()
-        .single();
-    final saved = Application.fromMap(row);
-    await requestAnalysis(saved.id);
-    return saved;
-  }
+    final request = http.MultipartRequest('POST', Uri.parse(AppConfig.n8nWebhookUrl))
+      ..headers['Authorization'] = 'Bearer $accessToken'
+      ..fields['user_id'] = userId;
+    if (jobId != null) request.fields['job_id'] = jobId;
+    if (jobTitle != null) request.fields['job_title'] = jobTitle;
+    request.files.add(
+      http.MultipartFile.fromBytes('cv', cvBytes, filename: cvFileName),
+    );
 
-  /// Hook for the CV-screening backend. The backend should read the stored CV,
-  /// score it against the job requirements and update this row's `status`.
-  /// Wire this to an Edge Function / queue once it is available.
-  Future<void> requestAnalysis(String applicationId) async {
-    // Intentionally empty until the analysis backend is linked.
-  }
-
-  /// Returns the storage path, or null if the bucket is unavailable — the
-  /// application is still recorded so the candidate sees a confirmation.
-  Future<String?> _uploadCv({
-    required String applicantId,
-    required String fileName,
-    required Uint8List bytes,
-  }) async {
-    final path = '$applicantId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
-    try {
-      await supabase.storage.from(_bucket).uploadBinary(path, bytes);
-      return path;
-    } catch (_) {
-      return null;
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        'The screening service rejected the CV (HTTP ${response.statusCode}).',
+      );
     }
   }
 
   static String describeError(Object error) {
-    final message = error.toString();
-    if (message.contains('SocketException') ||
-        message.contains('ClientException')) {
-      return 'Could not reach the server. Check your connection and try again.';
+    if (error is http.ClientException ||
+        error.toString().contains('SocketException') ||
+        error.toString().contains('ClientException')) {
+      return 'Could not reach the screening service. Check your connection and try again.';
     }
-    return message;
+    return error.toString();
   }
 }
