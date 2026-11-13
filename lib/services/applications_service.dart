@@ -14,9 +14,22 @@ class ApplicationsService {
     final rows = await supabase
         .from('applications')
         .select()
-        .eq('id', userId)
+        .eq('user_id', userId)
         .order('created_at', ascending: false);
     return rows.map(Application.fromMap).toList();
+  }
+
+  /// True when the candidate already has an application for this job, so the
+  /// UI can block a duplicate submit before hitting the webhook. The unique
+  /// (user_id, job_id) index is the authoritative guard.
+  Future<bool> hasApplied(String userId, String jobId) async {
+    final row = await supabase
+        .from('applications')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('job_id', jobId)
+        .maybeSingle();
+    return row != null;
   }
 
   /// Uploads the CV to the n8n webhook with the signed-in user's Supabase
@@ -25,6 +38,7 @@ class ApplicationsService {
   /// fields so the run can be tied to the advertised role.
   Future<void> submitCv({
     required String userId,
+    required String emailAddress,
     required Uint8List cvBytes,
     required String cvFileName,
     String? jobId,
@@ -36,7 +50,8 @@ class ApplicationsService {
     }
     final request = http.MultipartRequest('POST', Uri.parse(AppConfig.n8nWebhookUrl))
       ..headers['Authorization'] = 'Bearer $accessToken'
-      ..fields['user_id'] = userId;
+      ..fields['user_id'] = userId
+      ..fields['email_address'] = emailAddress;
     if (jobId != null) request.fields['job_id'] = jobId;
     if (jobTitle != null) request.fields['job_title'] = jobTitle;
     request.files.add(

@@ -97,7 +97,8 @@ class _CvUploadState extends State<CvUpload> {
       return;
     }
     final userId = _auth.user?.id;
-    if (userId == null) {
+    final email = _auth.user?.email;
+    if (userId == null || email == null) {
       setState(() => _formError = 'Please sign in before applying.');
       return;
     }
@@ -108,9 +109,18 @@ class _CvUploadState extends State<CvUpload> {
     });
     try {
       final job = _selectedJob!;
+      if (await _applications.hasApplied(userId, job.id)) {
+        if (!mounted) return;
+        setState(() {
+          _submitting = false;
+          _formError = 'You have already applied for this job.';
+        });
+        return;
+      }
       final bytes = await _cvFile!.readAsBytes();
       await _applications.submitCv(
         userId: userId,
+        emailAddress: email,
         cvBytes: bytes,
         cvFileName: _cvFile!.name,
         jobId: job.id,
@@ -621,7 +631,10 @@ class _ApplicationCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'CV review',
+                  (application.jobTitle != null &&
+                          application.jobTitle!.isNotEmpty)
+                      ? application.jobTitle!
+                      : 'CV review',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

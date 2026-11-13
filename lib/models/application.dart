@@ -1,12 +1,15 @@
-/// One AI CV-screening result per candidate.
-/// The `applications` table is keyed by `id`, which is the candidate's
-/// `auth.users` uuid (primary key = one row per user), so there is no separate
-/// applicant/job id. Scores are 0-100 percentages written by the n8n backend.
+/// One AI CV-screening result row.
+/// The `applications` table has its own row `id` (a generated uuid) and a
+/// `user_id` that references the candidate's `auth.users` uuid, so a candidate
+/// can have several reviews. Scores are 0-100 percentages written by the n8n
+/// backend. `id` here is the row id, not the user id.
 class Application {
   const Application({
     required this.id,
     required this.createdAt,
     required this.name,
+    this.jobId,
+    this.jobTitle,
     required this.overallScore,
     required this.skillMatch,
     required this.experienceMatch,
@@ -21,6 +24,8 @@ class Application {
   final String id;
   final DateTime createdAt;
   final String name;
+  final String? jobId;
+  final String? jobTitle;
   final double overallScore;
   final double skillMatch;
   final double experienceMatch;
@@ -35,6 +40,8 @@ class Application {
         id: map['id'] as String,
         createdAt: DateTime.parse(map['created_at'] as String),
         name: (map['name'] as String?) ?? '',
+        jobId: map['job_id'] as String?,
+        jobTitle: map['job_title'] as String?,
         overallScore: (map['overall_score'] as num?)?.toDouble() ?? 0,
         skillMatch: (map['skill_match'] as num?)?.toDouble() ?? 0,
         experienceMatch: (map['experience_match'] as num?)?.toDouble() ?? 0,
