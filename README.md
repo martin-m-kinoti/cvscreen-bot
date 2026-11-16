@@ -1,17 +1,26 @@
 # cvscreen
 
-A new Flutter project.
+A Flutter app for AI-assisted CV screening. Candidates upload their CV against
+an advertised job; an n8n workflow scores it and writes the result back for both
+the candidate and the recruiter to view.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- Candidate sign-in (email/password and Google) and recruiter accounts
+- Browse advertised jobs and submit a CV to a role
+- AI scoring per application (skill, experience, education, certification matches)
+- Recruiter views: manage jobs, review applicants, and manage user accounts
 
-A few resources to get you started if this is your first Flutter project:
+## Stack
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- **Flutter** (Dart): single codebase for mobile and web
+- **Supabase**: authentication and Postgres data
+- **n8n**: CV screening workflow triggered via webhook
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Getting started
+
+1. Provide the Supabase URL/anon key and the n8n webhook URL in the app's
+   environment config.
+2. Run `flutter pub get`.
+3. Apply the SQL in `supabase/` through the Supabase dashboard.
+4. Launch with `flutter run`.
