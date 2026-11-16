@@ -9,7 +9,10 @@ import 'pages/user/listed_jobs.dart';
 import 'pages/user/sign_in.dart';
 import 'pages/user/sign_up.dart';
 import 'pages/user/upload_cv.dart';
+import 'pages/admin/home_page.dart';
 import 'pages/admin/jobs_page.dart';
+import 'pages/admin/applications_page.dart';
+import 'pages/admin/user_management_page.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -40,11 +43,16 @@ class _MyAppState extends State<MyApp> {
   }
 
   // Google OAuth returns through a deep link, so navigation is driven by the
-  // auth stream rather than by the pages that started the flow.
-  void _handleAuthChange(AuthState state) {
-    if (state.event == AuthChangeEvent.signedIn) {
-      navigatorKey.currentState?.pushNamedAndRemoveUntil('/', (route) => false);
-    }
+  // auth stream rather than by the pages that started the flow. The signed-in
+  // user's role decides which journey they land on.
+  void _handleAuthChange(AuthState state) async {
+    final signedInNow = state.event == AuthChangeEvent.signedIn ||
+        state.event == AuthChangeEvent.initialSession;
+    if (!signedInNow) return;
+    final role = await _auth.fetchRole();
+    final destination = role == 'recruiter' ? '/admin' : '/';
+    navigatorKey.currentState
+        ?.pushNamedAndRemoveUntil(destination, (route) => false);
   }
 
   void _handleAuthError(Object error) {
@@ -73,7 +81,14 @@ class _MyAppState extends State<MyApp> {
       routes: {
         '/': (context) => const HomePage(),
         '/jobs': (context) => const _RequireAuth(child: ListedJobs()),
-        '/admin-jobs': (context) => const _RequireAuth(child: JobsPage()),
+        '/admin': (context) =>
+            const _RequireRole(role: 'recruiter', child: AdminHome()),
+        '/admin-jobs': (context) =>
+            const _RequireRole(role: 'recruiter', child: JobsPage()),
+        '/admin-applications': (context) => const _RequireRole(
+            role: 'recruiter', child: AdminApplications()),
+        '/admin-users': (context) =>
+            const _RequireRole(role: 'recruiter', child: UserManagement()),
         '/sign-up': (context) => const SignUpPage(),
         '/sign-in': (context) => const SignInPage(),
         '/upload-cv': (context) => const _RequireAuth(child: CvUpload()),
@@ -109,4 +124,59 @@ class _RequireAuthState extends State<_RequireAuth> {
   @override
   Widget build(BuildContext context) =>
       AuthService().isSignedIn ? widget.child : const SizedBox.shrink();
+}
+
+/// Gate for the recruiter-only pages: requires an active session whose
+/// `profiles.role` matches [role]. Signed-out users are sent to sign-in and
+/// wrong-role users to the candidate home, so deep links cannot bypass it.
+class _RequireRole extends StatefulWidget {
+  const _RequireRole({required this.role, required this.child});
+
+  final String role;
+  final Widget child;
+
+  @override
+  State<_RequireRole> createState() => _RequireRoleState();
+}
+
+class _RequireRoleState extends State<_RequireRole> {
+  bool _authorized = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  Future<void> _check() async {
+    final auth = AuthService();
+    if (!auth.isSignedIn) {
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/sign-in', (route) => false);
+      return;
+    }
+    final role = await auth.fetchRole();
+    if (!mounted) return;
+    if (role == widget.role) {
+      setState(() {
+        _authorized = true;
+        _loading = false;
+      });
+    } else {
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF0D9488)),
+        ),
+      );
+    }
+    return _authorized ? widget.child : const SizedBox.shrink();
+  }
 }

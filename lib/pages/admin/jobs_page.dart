@@ -4,6 +4,7 @@ import '../../services/auth_service.dart';
 import '../../services/jobs_service.dart';
 import '../../widgets/auth_error_banner.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/dashboard_header.dart';
 import '../../widgets/dashboard_nav_bar.dart';
 
 class JobsPage extends StatefulWidget {
@@ -229,14 +230,13 @@ class _JobsPageState extends State<JobsPage> {
   void _onNavTap(int index) {
     switch (index) {
       case 0:
-        Navigator.pushReplacementNamed(context, '/');
+        Navigator.pushReplacementNamed(context, '/admin');
       case 1:
         break;
       case 2:
+        Navigator.pushReplacementNamed(context, '/admin-applications');
       case 3:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This section is coming soon.')),
-        );
+        Navigator.pushReplacementNamed(context, '/admin-users');
       case 4:
         _signOut();
     }
@@ -279,9 +279,10 @@ class _JobsPageState extends State<JobsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Image.asset('lib/assets/logo.png', height: 40),
+              DashboardHeader(
+                signedIn: true,
+                displayName: _auth.displayName,
+                teal: JobsPage._teal,
               ),
               const SizedBox(height: 12),
               const Text(

@@ -25,6 +25,36 @@ class AuthService {
     return 'Account';
   }
 
+  static String? _roleCache;
+  static String? _roleCacheUserId;
+
+  /// Reads the signed-in user's role from the `profiles` table. Falls back to
+  /// 'candidate' when there is no session, no profile row, or the lookup fails,
+  /// so the admin area stays locked until a recruiter row is provisioned.
+  Future<String> fetchRole() async {
+    final uid = user?.id;
+    if (uid == null) {
+      _roleCache = null;
+      _roleCacheUserId = null;
+      return 'candidate';
+    }
+    if (_roleCacheUserId == uid && _roleCache != null) return _roleCache!;
+    String role = 'candidate';
+    try {
+      final row = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', uid)
+          .maybeSingle();
+      role = (row?['role'] as String?) ?? 'candidate';
+    } catch (_) {
+      role = 'candidate';
+    }
+    _roleCache = role;
+    _roleCacheUserId = uid;
+    return role;
+  }
+
   Future<AuthResponse> signUp({
     required String email,
     required String password,
@@ -53,7 +83,11 @@ class AuthService {
         queryParams: {'prompt': 'select_account'},
       );
 
-  Future<void> signOut() => supabase.auth.signOut();
+  Future<void> signOut() async {
+    _roleCache = null;
+    _roleCacheUserId = null;
+    await supabase.auth.signOut();
+  }
 
   static String describeError(Object error) {
     if (error is AuthException) {

@@ -7,6 +7,9 @@ class AppConfig {
   static String get supabaseUrl => _require('SUPABASE_URL');
   static String get supabaseAnonKey => _require('SUPABASE_ANON_KEY');
 
+  /// n8n workflow endpoint that receives the CV for screening.
+  static String get n8nWebhookUrl => _require('N8N_WEBHOOK_URL');
+
   static String _require(String key) {
     final value = dotenv.env[key];
     if (value == null || value.isEmpty) {
