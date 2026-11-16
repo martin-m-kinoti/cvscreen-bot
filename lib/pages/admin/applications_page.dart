@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../models/applicant.dart';
 import '../../models/job.dart';
+import '../../services/applications_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/jobs_service.dart';
 import '../../widgets/auth_error_banner.dart';
@@ -8,8 +10,8 @@ import '../../widgets/dashboard_header.dart';
 import '../../widgets/dashboard_nav_bar.dart';
 
 /// Recruiter view of the applicants screened against a chosen role, with a
-/// minimum-score filter. Applicant rows populate once the analysis backend is
-/// linked; the job list is read live from Supabase.
+/// minimum-score filter. Both the job list and the applicant rows are read
+/// live from Supabase.
 class AdminApplications extends StatefulWidget {
   const AdminApplications({super.key});
 
@@ -17,6 +19,7 @@ class AdminApplications extends StatefulWidget {
   static const border = Color(0xFFDBEFED);
   static const inputBorder = Color(0xFFD4ECEA);
   static const danger = Color(0xFFB91C1C);
+  static const amber = Color(0xFFB45309);
 
   @override
   State<AdminApplications> createState() => _AdminApplicationsState();
@@ -25,6 +28,7 @@ class AdminApplications extends StatefulWidget {
 class _AdminApplicationsState extends State<AdminApplications> {
   final _auth = AuthService();
   final _jobsService = JobsService();
+  final _applications = ApplicationsService();
   final _scoreController = TextEditingController();
 
   List<Job> _jobs = [];
@@ -32,8 +36,9 @@ class _AdminApplicationsState extends State<AdminApplications> {
   String? _jobsError;
   String? _selectedJobId;
 
-  // Populated by the analysis backend.
-  final List<_Applicant> _applicants = [];
+  List<Applicant> _applicants = [];
+  bool _applicantsLoading = false;
+  String? _applicantsError;
 
   @override
   void initState() {
@@ -45,6 +50,12 @@ class _AdminApplicationsState extends State<AdminApplications> {
   void dispose() {
     _scoreController.dispose();
     super.dispose();
+  }
+
+  String? get _selectedJobTitle {
+    if (_selectedJobId == null) return null;
+    final job = _jobs.where((j) => j.id == _selectedJobId);
+    return job.isEmpty ? null : job.first.title;
   }
 
   Future<void> _loadJobs() async {
@@ -59,11 +70,30 @@ class _AdminApplicationsState extends State<AdminApplications> {
         _jobs = jobs;
         _selectedJobId = jobs.isEmpty ? null : jobs.first.id;
       });
+      _loadApplicants();
     } catch (e) {
       if (!mounted) return;
       setState(() => _jobsError = JobsService.describeError(e));
     } finally {
       if (mounted) setState(() => _jobsLoading = false);
+    }
+  }
+
+  Future<void> _loadApplicants() async {
+    setState(() {
+      _applicantsLoading = true;
+      _applicantsError = null;
+    });
+    try {
+      final applicants =
+          await _applications.fetchApplicants(jobTitle: _selectedJobTitle);
+      if (!mounted) return;
+      setState(() => _applicants = applicants);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _applicantsError = ApplicationsService.describeError(e));
+    } finally {
+      if (mounted) setState(() => _applicantsLoading = false);
     }
   }
 
@@ -105,7 +135,7 @@ class _AdminApplicationsState extends State<AdminApplications> {
     }
   }
 
-  List<_Applicant> get _filtered {
+  List<Applicant> get _filtered {
     final min = int.tryParse(_scoreController.text.trim());
     if (min == null) return _applicants;
     return _applicants.where((a) => a.score >= min).toList();
@@ -205,7 +235,10 @@ class _AdminApplicationsState extends State<AdminApplications> {
             for (final job in _jobs)
               DropdownMenuItem(value: job.id, child: Text(job.title)),
           ],
-          onChanged: (value) => setState(() => _selectedJobId = value),
+          onChanged: (value) {
+            setState(() => _selectedJobId = value);
+            _loadApplicants();
+          },
         ),
       ),
     );
@@ -261,6 +294,41 @@ class _AdminApplicationsState extends State<AdminApplications> {
   }
 
   Widget _buildTable() {
+    if (_applicantsLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: AdminApplications.teal,
+            ),
+          ),
+        ),
+      );
+    }
+    if (_applicantsError != null) {
+      return Column(
+        children: [
+          AuthErrorBanner(
+            message: _applicantsError!,
+            onDismiss: () => setState(() => _applicantsError = null),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: _loadApplicants,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AdminApplications.teal,
+              side: const BorderSide(color: AdminApplications.teal),
+            ),
+            child: const Text('Retry'),
+          ),
+        ],
+      );
+    }
+
     final rows = _filtered;
     return Column(
       children: [
@@ -285,22 +353,24 @@ class _AdminApplicationsState extends State<AdminApplications> {
             _tableRow(
               _cell(a.name, flex: 3),
               _cell(a.email, flex: 4, underline: true),
-              _cell(
-                '${a.score}',
-                flex: 2,
-                color: a.match ? AdminApplications.teal : AdminApplications.danger,
-              ),
-              _cell(
-                a.match ? 'Match' : 'Not Match',
-                flex: 2,
-                color: a.match ? AdminApplications.teal : AdminApplications.danger,
-              ),
+              _cell('${a.score}', flex: 2, color: _statusColor(a)),
+              _cell(_statusLabel(a), flex: 2, color: _statusColor(a)),
             ),
             const SizedBox(height: 14),
           ],
       ],
     );
   }
+
+  static Color _statusColor(Applicant a) => switch (a.status) {
+        'Strong Match' => AdminApplications.teal,
+        'Possible Match' => AdminApplications.amber,
+        'Not a Match' => AdminApplications.danger,
+        _ => Colors.grey.shade600,
+      };
+
+  static String _statusLabel(Applicant a) =>
+      a.isPending ? 'Under review' : a.status;
 
   Widget _tableRow(Widget a, Widget b, Widget c, Widget d) {
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [a, b, c, d]);
@@ -317,6 +387,7 @@ class _AdminApplicationsState extends State<AdminApplications> {
       flex: flex,
       child: Text(
         text,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 12,
           fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
@@ -326,12 +397,4 @@ class _AdminApplicationsState extends State<AdminApplications> {
       ),
     );
   }
-}
-
-class _Applicant {
-  const _Applicant(this.name, this.email, this.score);
-  final String name;
-  final String email;
-  final int score;
-  bool get match => score >= 50;
 }

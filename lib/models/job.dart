@@ -47,6 +47,7 @@ class Job {
     String? experienceLevel,
     String? educationLevel,
     String? additionalRequirements,
+    int? applicantCount,
   }) =>
       Job(
         id: id,
@@ -56,7 +57,7 @@ class Job {
         educationLevel: educationLevel ?? this.educationLevel,
         additionalRequirements: additionalRequirements ?? this.additionalRequirements,
         status: status,
-        applicantCount: applicantCount,
+        applicantCount: applicantCount ?? this.applicantCount,
         createdAt: createdAt,
       );
 }

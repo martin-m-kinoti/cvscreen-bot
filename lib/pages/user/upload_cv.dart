@@ -109,14 +109,6 @@ class _CvUploadState extends State<CvUpload> {
     });
     try {
       final job = _selectedJob!;
-      if (await _applications.hasApplied(userId, job.id)) {
-        if (!mounted) return;
-        setState(() {
-          _submitting = false;
-          _formError = 'You have already applied for this job.';
-        });
-        return;
-      }
       final bytes = await _cvFile!.readAsBytes();
       await _applications.submitCv(
         userId: userId,

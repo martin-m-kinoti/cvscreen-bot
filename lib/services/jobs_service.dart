@@ -1,13 +1,35 @@
 import '../config/app_config.dart';
 import '../models/job.dart';
+import 'applications_service.dart';
 
 class JobsService {
+  final _applications = ApplicationsService();
+
+  /// Loads advertised jobs and stamps each with a live applicant count.
+  /// `jobs` has no applicant count column and `applications` RLS hides other
+  /// candidates' rows from a recruiter, so counts come from the
+  /// recruiter-gated `admin_list_applications()` function grouped by job title.
   Future<List<Job>> fetchJobs() async {
     final rows = await supabase
         .from('jobs')
         .select()
         .order('created_at', ascending: false);
-    return rows.map(Job.fromMap).toList();
+    final jobs = rows.map(Job.fromMap).toList();
+
+    final counts = <String, int>{};
+    try {
+      for (final applicant in await _applications.fetchApplicants()) {
+        final title = applicant.jobTitle;
+        if (title == null) continue;
+        counts[title] = (counts[title] ?? 0) + 1;
+      }
+    } catch (_) {
+      // Counts are best-effort; leave them at zero if the function is missing.
+    }
+
+    return [
+      for (final job in jobs) job.copyWith(applicantCount: counts[job.title] ?? 0),
+    ];
   }
 
   Future<Job> createJob(Job job) async {
@@ -22,7 +44,8 @@ class JobsService {
         .eq('id', id)
         .select()
         .single();
-    return Job.fromMap(row);
+    // The reloaded row has no applicant_count, so keep the loaded count.
+    return Job.fromMap(row).copyWith(applicantCount: job.applicantCount);
   }
 
   Future<void> deleteJob(String id) =>

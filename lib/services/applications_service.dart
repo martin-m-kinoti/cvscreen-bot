@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import '../models/applicant.dart';
 import '../models/application.dart';
 
 /// Candidate-facing applications. The CV is NOT stored in Supabase: it is
@@ -19,17 +20,18 @@ class ApplicationsService {
     return rows.map(Application.fromMap).toList();
   }
 
-  /// True when the candidate already has an application for this job, so the
-  /// UI can block a duplicate submit before hitting the webhook. The unique
-  /// (user_id, job_id) index is the authoritative guard.
-  Future<bool> hasApplied(String userId, String jobId) async {
-    final row = await supabase
-        .from('applications')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('job_id', jobId)
-        .maybeSingle();
-    return row != null;
+  /// Recruiter view: screened applicants joined with their email. Pass a job
+  /// title to scope to one role, or null for all. Backed by the
+  /// recruiter-gated `admin_list_applications()` function.
+  Future<List<Applicant>> fetchApplicants({String? jobTitle}) async {
+    final rows = await supabase.rpc(
+      'admin_list_applications',
+      params: {'p_job_title': jobTitle},
+    );
+    final list = (rows as List?) ?? const [];
+    return list
+        .map((row) => Applicant.fromMap(Map<String, dynamic>.from(row as Map)))
+        .toList();
   }
 
   /// Uploads the CV to the n8n webhook with the signed-in user's Supabase
