@@ -52,3 +52,35 @@ create policy "Users can update own application record"
 
 create index if not exists applications_user_id_idx
   on public.applications (user_id);
+
+
+-- Telegram data
+create table if not exists public.telegram_applications (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+
+  telegram_chat_id bigint not null,
+  job_title text not null,
+
+  -- Percentage values (0-100)
+  overall_score numeric(5,2) not null check (overall_score between 0 and 100),
+  skill_match numeric(5,2) not null check (skill_match between 0 and 100),
+  experience_match numeric(5,2) not null check (experience_match between 0 and 100),
+  education_match numeric(5,2) not null check (education_match between 0 and 100),
+  cert_match numeric(5,2) not null check (cert_match between 0 and 100),
+
+  summary text,
+  strengths text[] not null default '{}',
+  weaknesses text[] not null default '{}',
+  status text not null
+    check (status in ('Strong Match', 'Possible Match', 'Not a Match')),
+
+  constraint telegram_applications_chat_job_unique
+    unique (telegram_chat_id, job_title)
+);
+
+create index if not exists telegram_applications_chat_idx
+  on public.telegram_applications (telegram_chat_id);
+
+-- Lock the table to the service role (n8n bypasses RLS)
+alter table public.telegram_applications enable row level security;
