@@ -1,6 +1,6 @@
 # cvscreen
 
-![CVScreen home page image](lib/assets/mobile-app-homepage.jpeg)
+<img src="lib/assets/mobile-app-homepage.jpeg" alt="CVScreen home page image" width="390">
 
 A Flutter app for AI-assisted CV screening. Candidates upload their CV against
 an advertised job; an n8n workflow scores it and writes the result back for both
