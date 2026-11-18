@@ -1,6 +1,7 @@
 # cvscreen
 
 ![CVScreen home page image](lib/assets/mobile-app-homepage.jpeg)
+
 A Flutter app for AI-assisted CV screening. Candidates upload their CV against
 an advertised job; an n8n workflow scores it and writes the result back for both
 the candidate and the recruiter to view.
